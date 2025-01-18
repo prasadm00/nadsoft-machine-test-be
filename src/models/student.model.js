@@ -9,11 +9,34 @@ import {
   deleteStudentQuery,
   upsertMarksQuery,
   deleteStudentMarksQuery,
+  getStudentByEmailQuery,
 } from '../queries/student.queries.js';
 
 const handleError = (operation, error) => {
   console.error(`Error during ${operation}:`, error.message);
-  throw new Error(`Failed to ${operation}. Please try again later.`);
+
+  let errorMessage = `Failed to ${operation}.`;
+  console.log(error.response);
+  if (error.response) {
+    const statusCode = error.response.status;
+    const statusText = error.response.statusText || '';
+    errorMessage += ` Server responded with status ${statusCode} (${statusText}).`;
+
+    if (statusCode === 404) {
+      errorMessage += ' Resource not found.';
+    } else if (statusCode === 401) {
+      errorMessage += ' Unauthorized access.';
+    } else if (statusCode === 500) {
+      errorMessage += ' Internal server error. Please try again later.';
+    }
+  } else if (error.request) {
+    errorMessage +=
+      ' No response from server. Please check your network connection.';
+  } else {
+    errorMessage += ` ${error.message}`;
+  }
+
+  throw new Error(errorMessage);
 };
 
 const upsertMarks = async (studentId, marks) => {
@@ -29,6 +52,13 @@ const upsertMarks = async (studentId, marks) => {
 export const createStudent = async (data) => {
   try {
     const { name, email, date_of_birth, marks } = data;
+    const studentDetails = await pool.query(
+      getStudentByEmailQuery,
+      [email]
+    )
+    if(studentDetails.rowCount){
+      throw new Error("Email already exists");
+    }
     const result = await pool.query(createStudentQuery, [
       name,
       email,
@@ -69,8 +99,8 @@ export const getStudents = async (page = 1, limit = 10) => {
       data: studentsResult.rows,
       totalCount,
       totalPages: Math.ceil(totalCount / limit),
-      currentPage: page,
-      pageSize: limit,
+      currentPage: +page,
+      pageSize: +limit,
     };
   } catch (error) {
     handleError('retrieve students', error);
@@ -80,7 +110,7 @@ export const getStudents = async (page = 1, limit = 10) => {
 export const getStudentById = async (id) => {
   try {
     const result = await pool.query(getStudentByIdQuery, [id]);
-    if (result.rows.length === 0) return null;
+    if (result.rows.length === 0) throw new Error('Student not found');
     const studentData = result.rows.reduce((student, row) => {
       if (!student) {
         student = {
@@ -110,17 +140,34 @@ export const getStudentById = async (id) => {
 
 export const updateStudent = async (id, data) => {
   try {
-    const { name, email, date_of_birth, marks } = data;
-    const result = await pool.query(updateStudentQuery, [
+    const studentResult = await pool.query(
+      getStudentByIdQuery,
+      [id]
+    );
+    if (studentResult.rows.length === 0) {
+      throw new Error('Student not found');
+    }
+
+    const existingStudent = studentResult.rows[0];
+
+    const updatedData = {
+      name: data.name || existingStudent.name,
+      email: data.email || existingStudent.email,
+      date_of_birth: data.date_of_birth || existingStudent.date_of_birth,
+      marks: data.marks || [],
+    };
+
+    const { name, email, date_of_birth } = updatedData;
+    const updateResult = await pool.query(updateStudentQuery, [
       name,
       email,
       date_of_birth,
       id,
     ]);
 
-    await upsertMarks(id, marks);
+    await upsertMarks(id, updatedData.marks);
 
-    return result.rows[0];
+    return updateResult.rows[0];
   } catch (error) {
     handleError('update a student', error);
   }
@@ -128,8 +175,18 @@ export const updateStudent = async (id, data) => {
 
 export const deleteStudent = async (id) => {
   try {
-    const result = await pool.query(deleteStudentQuery, [id]);
-    return result.rows[0];
+    const studentResult = await pool.query(
+      getStudentByIdQuery,
+      [id]
+    );
+    if (studentResult.rows.length === 0) {
+      throw new Error('Student not found');
+    }
+
+    const deleteResult = await pool.query(deleteStudentQuery, [id]);
+    return deleteResult.rowCount > 0
+      ? { message: 'Student deleted successfully.' }
+      : { message: 'Failed to delete the student.' };
   } catch (error) {
     handleError('delete a student', error);
   }

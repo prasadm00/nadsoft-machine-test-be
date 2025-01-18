@@ -50,3 +50,9 @@ export const upsertMarksQuery = `
 export const deleteStudentMarksQuery = `
   DELETE FROM marks WHERE student_id = $1
 `;
+
+export const getStudentByEmailQuery = `
+  SELECT *
+  FROM students
+  WHERE email = $1;
+`

@@ -1,4 +1,4 @@
-# Student Management API
+# Nadsoft Student Management API
 
 This is a backend API for managing students and their marks. The API allows creating, updating, deleting, and fetching student details along with their marks. It also supports pagination for listing students.
 

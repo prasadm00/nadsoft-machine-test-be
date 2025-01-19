@@ -35,6 +35,10 @@ CREATE DATABASE nadsoft_mt_db;
 -- Connect to the newly created database
 \c nadsoft_mt_db;
 
+```
+
+```bash
+
 -- Enable the uuid-ossp extension to generate UUIDs
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
